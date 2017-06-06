@@ -9,6 +9,8 @@ const ServerBidAdapter = function ServerBidAdapter() {
   const baseAdapter = Adapter.createNew('serverbid');
 
   const BASE_URI = '//e.serverbid.com/api/v2';
+  const SMARTSYNC_BASE_URI = '//static.adzerk.net/ss';
+  const SMARTSYNC_CALLBACK = 'serverBidCallBids';
 
   const sizeMap = [null,
     "120x90",
@@ -44,46 +46,74 @@ const ServerBidAdapter = function ServerBidAdapter() {
   const bidIds = [];
 
   baseAdapter.callBids = function(params) {
-
     if (params && params.bids && utils.isArray(params.bids) && params.bids.length) {
-
-      const data = {
-        placements: [],
-        time: Date.now(),
-        user: {},
-        url: utils.getTopWindowUrl(),
-        referrer: document.referrer,
-        enableBotFiltering: true,
-        includePricingData: true
+      window[SMARTSYNC_CALLBACK] = function() {
+        _callBids(params);
       };
 
-      const bids = params.bids || [];
-      for (let i = 0; i < bids.length; i++) {
-        const bid = bids[i];
+      const siteId = params.bids[0].params.siteId;
+      const smartSyncTimeout = (params.timeout || 500) / 2;
 
-        bidIds.push(bid.bidId);
+      // This script will write partner cookie syncing pixels (if necessary)
+      // and call window.serverBidContinueCallBids() when those pixels have
+      // finished loading.
+      _appendScript(SMARTSYNC_BASE_URI + '/' + siteId + '.js');
 
-        const bid_data = {
-          networkId: bid.params.networkId,
-          siteId: bid.params.siteId,
-          zoneIds: bid.params.zoneIds,
-          campaignId: bid.params.campaignId,
-          flightId: bid.params.flightId,
-          adId: bid.params.adId,
-          divName: bid.bidId,
-          adTypes: bid.adTypes || getSize(bid.sizes)
-        };
+      // This is a failsafe in case cookie syncing is slow. The callback is a
+      // noop if window.serverBidContinueCallBids() has already been executed.
+      setTimeout(function() {
+        window[SMARTSYNC_CALLBACK]();
+      }, smartSyncTimeout);
+    }
+  };
 
-        if (bid_data.networkId && bid_data.siteId) {
-          data.placements.push(bid_data);
-        }
+  function _appendScript(src) {
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = src;
+    document.getElementsByTagName('head')[0].appendChild(script);
+  };
 
+  function _callBids(params) {
+    // Subsequent calls to the smartsync callback will be noops.
+    window[SMARTSYNC_CALLBACK] = function() {};
+
+    const data = {
+      placements: [],
+      time: Date.now(),
+      user: {},
+      url: utils.getTopWindowUrl(),
+      referrer: document.referrer,
+      enableBotFiltering: true,
+      includePricingData: true
+    };
+
+    const bids = params.bids || [];
+
+    for (let i = 0; i < bids.length; i++) {
+      const bid = bids[i];
+
+      bidIds.push(bid.bidId);
+
+      const bid_data = {
+        networkId: bid.params.networkId,
+        siteId: bid.params.siteId,
+        zoneIds: bid.params.zoneIds,
+        campaignId: bid.params.campaignId,
+        flightId: bid.params.flightId,
+        adId: bid.params.adId,
+        divName: bid.bidId,
+        adTypes: bid.adTypes || getSize(bid.sizes)
+      };
+
+      if (bid_data.networkId && bid_data.siteId) {
+        data.placements.push(bid_data);
       }
 
-      if (data.placements.length) {
-        ajax(BASE_URI, _responseCallback, JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
-      }
+    }
 
+    if (data.placements.length) {
+      ajax(BASE_URI, _responseCallback, JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
     }
 
   };
