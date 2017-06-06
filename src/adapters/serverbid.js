@@ -95,21 +95,14 @@ const ServerBidAdapter = function ServerBidAdapter() {
 
       bidIds.push(bid.bidId);
 
-      const bid_data = {
-        networkId: bid.params.networkId,
-        siteId: bid.params.siteId,
-        zoneIds: bid.params.zoneIds,
-        campaignId: bid.params.campaignId,
-        flightId: bid.params.flightId,
-        adId: bid.params.adId,
+      const placement = utils.extend({
         divName: bid.bidId,
         adTypes: bid.adTypes || getSize(bid.sizes)
-      };
+      }, bid.params);
 
-      if (bid_data.networkId && bid_data.siteId) {
-        data.placements.push(bid_data);
+      if (placement.networkId && placement.siteId) {
+        data.placements.push(placement);
       }
-
     }
 
     if (data.placements.length) {
