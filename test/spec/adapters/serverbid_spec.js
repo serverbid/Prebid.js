@@ -73,7 +73,6 @@ describe('serverbidAdapter', () => {
     let requests;
     let pbConfig;
 
-
     beforeEach(() => {
       xhr = sinon.useFakeXMLHttpRequest();
       requests = [];
@@ -91,6 +90,7 @@ describe('serverbidAdapter', () => {
 
     it('requires paramaters to make request', () => {
       adapter.callBids({});
+      expect(window.serverbidCallBids).to.be.empty;
       expect(requests).to.be.empty;
     });
 
@@ -98,10 +98,12 @@ describe('serverbidAdapter', () => {
       let backup = pbConfig.bids[0].params;
       pbConfig.bids[0].params = { networkId: 1234 }; //no hbid
       adapter.callBids(pbConfig);
+      window.serverbidCallBids(pbConfig);
       expect(requests).to.be.empty;
 
       pbConfig.bids[0].params = { siteId: 1234 }; //no placementid
       adapter.callBids(pbConfig);
+      window.serverbidCallBids(pbConfig);
       expect(requests).to.be.empty;
 
       pbConfig.bids[0].params = backup;
@@ -109,6 +111,7 @@ describe('serverbidAdapter', () => {
 
     it('sends bid request to ENDPOINT via POST', () => {
       adapter.callBids(pbConfig);
+      window.serverbidCallBids(pbConfig);
       expect(requests[0].url).to.equal(ENDPOINT);
       expect(requests[0].method).to.equal('POST');
     });
@@ -134,6 +137,7 @@ describe('serverbidAdapter', () => {
       server.respondWith(JSON.stringify(RESPONSE));
 
       adapter.callBids(REQUEST);
+      window.serverbidCallBids(REQUEST);
       server.respond();
       sinon.assert.calledOnce(bidmanager.addBidResponse);
 
@@ -149,6 +153,7 @@ describe('serverbidAdapter', () => {
       }));
 
       adapter.callBids(REQUEST);
+      window.serverbidCallBids(REQUEST);
       server.respond();
       sinon.assert.calledOnce(bidmanager.addBidResponse);
 
@@ -163,6 +168,7 @@ describe('serverbidAdapter', () => {
       server.respondWith('');
 
       adapter.callBids(REQUEST);
+      window.serverbidCallBids(REQUEST);
       server.respond();
       sinon.assert.calledOnce(bidmanager.addBidResponse);
 

@@ -8,9 +8,9 @@ const ServerBidAdapter = function ServerBidAdapter() {
 
   const baseAdapter = Adapter.createNew('serverbid');
 
-  const BASE_URI = '//e.serverbid.com/api/v2';
+  const SERVERBID_BASE_URI = '//e.serverbid.com/api/v2';
   const SMARTSYNC_BASE_URI = '//static.adzerk.net/ss';
-  const SMARTSYNC_CALLBACK = 'serverBidCallBids';
+  const SMARTSYNC_CALLBACK = 'serverbidCallBids';
 
   const sizeMap = [null,
     "120x90",
@@ -72,7 +72,7 @@ const ServerBidAdapter = function ServerBidAdapter() {
     script.type = 'text/javascript';
     script.src = src;
     document.getElementsByTagName('head')[0].appendChild(script);
-  };
+  }
 
   function _callBids(params) {
     // Subsequent calls to the smartsync callback will be noops.
@@ -106,10 +106,10 @@ const ServerBidAdapter = function ServerBidAdapter() {
     }
 
     if (data.placements.length) {
-      ajax(BASE_URI, _responseCallback, JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
+      ajax(SERVERBID_BASE_URI, _responseCallback, JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
     }
 
-  };
+  }
 
   function _responseCallback(result) {
 
