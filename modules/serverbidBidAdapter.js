@@ -25,6 +25,7 @@ ServerBidAdapter = function ServerBidAdapter() {
   };
 
   const SMARTSYNC_CALLBACK = 'serverbidCallBids';
+  const SERVERBID_S2S_ALIAS = 'serverbidServer';
 
   const sizeMap = [
     null,
@@ -64,13 +65,58 @@ ServerBidAdapter = function ServerBidAdapter() {
 
   const bidIds = [];
 
+  let _s2sconfig;
+  baseAdapter.setConfig = function(s2sconfig) {
+    _s2sconfig = s2sconfig || {};
+  };
+
+  function getS2SConfig() {
+    // Prevent _s2sconfig.foo EROR can't call foo of undefined.
+    return (_s2sconfig || {});
+  }
+
+  function isS2S() {
+    // Know which mode the adapter should operate under.
+    return (getS2SConfig().adapter === SERVERBID_S2S_ALIAS);
+  }
+
+  baseAdapter.queueSync = function({bidderCodes}) {
+    // Prebid user-sync. Waiting to implement when we transition to 1.0
+    return {};
+  };
+
+  function determineOperationMode(code) {
+    let bidderCode;
+    let shouldDoWorkFn;
+    if (code) {
+      bidderCode = code;
+      shouldDoWorkFn = function(adunit) {
+        return adunit &&
+          adunit.bids &&
+          utils.isArray(adunit.bids) &&
+          adunit.bids.length &&
+          CONFIG[bidderCode];
+      }
+    } else {
+      bidderCode = isS2S() ? 'serverbid' : '';
+      shouldDoWorkFn = function(bidRequest) {
+        return bidRequest &&
+          bidRequest.ad_units &&
+          utils.isArray(bidRequest.ad_units) &&
+          bidRequest.ad_units.length;
+      }
+    }
+    return [bidderCode, shouldDoWorkFn];
+  }
+
   baseAdapter.callBids = function(params) {
-    if (params && params.bids &&
-        utils.isArray(params.bids) &&
-        params.bids.length &&
-        CONFIG[params.bidderCode]) {
-      const config = CONFIG[params.bidderCode];
-      config.request = window[params.bidderCode.toUpperCase() + '_CONFIG'];
+    let [bidderCode, shouldDoWorkFn] = determineOperationMode(params.bidderCode);
+    console.log('bidderCode ' + bidderCode);
+    console.log('isS2S ' + isS2S());
+    console.log('params::::' + JSON.stringify(params));
+    if (shouldDoWorkFn(params)) {
+      const config = CONFIG[bidderCode];
+      config.request = window[bidderCode.toUpperCase() + '_CONFIG'];
       if (!window.SMARTSYNC) {
         _callBids(config, params);
       } else {
@@ -99,7 +145,57 @@ ServerBidAdapter = function ServerBidAdapter() {
     document.getElementsByTagName('head')[0].appendChild(script);
   }
 
-  function _callBids(config, params) {
+  function _convertFields(bid) {
+    let safeBid = bid || {};
+    let converted = {};
+    let name = safeBid.bidder;
+    converted[name] = safeBid.params;
+    return converted;
+  }
+
+  function _callBidsS2S(config, bidRequest) {
+    for (let i = 0; i < bidRequest.ad_units.length; i++) {
+      let adunit = bidRequest.ad_units[i];
+      let siteId = getS2SConfig().siteId;
+      let networkId = getS2SConfig().networkId;
+      let code = adunit.code;
+      let sizes = adunit.sizes;
+
+      const data = Object.assign({
+        placements: [],
+        time: Date.now(),
+        user: {},
+        url: utils.getTopWindowUrl(),
+        referrer: document.referrer,
+        enableBotFiltering: true,
+        includePricingData: true,
+      }, config.request);
+
+      const bids = adunit.bids || [];
+
+      for (let i = 0; i < bids.length; i++) {
+        const bid = bids[i];
+
+        bidIds.push(bid.bidId);
+
+        const placement = Object.assign({
+          divName: code,
+          networkId: networkId,
+          siteId: siteId,
+          adTypes: bid.adTypes || getSize(sizes),
+          bidders: _convertFields(bid),
+          skipSelection: true
+        });
+
+        if (placement.networkId && placement.siteId) {
+          data.placements.push(placement);
+        }
+      }
+      console.log(data);
+    }
+  }
+
+  function _callBidsStandard(config, params) {
     const data = Object.assign({
       placements: [],
       time: Date.now(),
@@ -130,6 +226,11 @@ ServerBidAdapter = function ServerBidAdapter() {
     if (data.placements.length) {
       ajax(config.BASE_URI, _responseCallback, JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
     }
+  }
+
+  function _callBids(config, params) {
+    let doit = isS2S() ? _callBidsS2S : _callBidsStandard;
+    doit(config, params);
   }
 
   function _responseCallback(result) {
@@ -179,9 +280,11 @@ ServerBidAdapter = function ServerBidAdapter() {
   }
 
   function getSize(sizes) {
+    let width = isS2S() ? 'w' : 0;
+    let height = isS2S() ? 'h' : 1;
     const result = [];
     sizes.forEach(function(size) {
-      const index = sizeMap.indexOf(size[0] + 'x' + size[1]);
+      const index = sizeMap.indexOf(size[width] + 'x' + size[height]);
       if (index >= 0) {
         result.push(index);
       }
@@ -192,8 +295,10 @@ ServerBidAdapter = function ServerBidAdapter() {
   // Export the `callBids` function, so that Prebid.js can execute
   // this function when the page asks to send out bid requests.
   return Object.assign(this, {
+    setConfig: baseAdapter.setConfig,
     callBids: baseAdapter.callBids,
-    setBidderCode: baseAdapter.setBidderCode
+    setBidderCode: baseAdapter.setBidderCode,
+    queueSync: baseAdapter.queueSync
   });
 };
 
@@ -202,6 +307,7 @@ ServerBidAdapter.createNew = function() {
 };
 
 adaptermanager.registerBidAdapter(new ServerBidAdapter(), 'serverbid');
+adaptermanager.aliasBidAdapter('serverbid', 'serverbidServer');
 adaptermanager.aliasBidAdapter('serverbid', 'connectad');
 adaptermanager.aliasBidAdapter('serverbid', 'onefiftytwo');
 
