@@ -71,7 +71,7 @@ ServerBidAdapter = function ServerBidAdapter() {
   };
 
   function getS2SConfig() {
-    // Prevent _s2sconfig.foo EROR can't call foo of undefined.
+    // Prevent _s2sconfig.foo ERROR can't call foo of undefined.
     return (_s2sconfig || {});
   }
 
@@ -111,9 +111,6 @@ ServerBidAdapter = function ServerBidAdapter() {
 
   baseAdapter.callBids = function(params) {
     let [bidderCode, shouldDoWorkFn] = determineOperationMode(params.bidderCode);
-    console.log('bidderCode ' + bidderCode);
-    console.log('isS2S ' + isS2S());
-    console.log('params::::' + JSON.stringify(params));
     if (shouldDoWorkFn(params)) {
       const config = CONFIG[bidderCode];
       config.request = window[bidderCode.toUpperCase() + '_CONFIG'];
@@ -158,7 +155,6 @@ ServerBidAdapter = function ServerBidAdapter() {
       let adunit = bidRequest.ad_units[i];
       let siteId = getS2SConfig().siteId;
       let networkId = getS2SConfig().networkId;
-      let code = adunit.code;
       let sizes = adunit.sizes;
 
       const data = Object.assign({
@@ -176,10 +172,10 @@ ServerBidAdapter = function ServerBidAdapter() {
       for (let i = 0; i < bids.length; i++) {
         const bid = bids[i];
 
-        bidIds.push(bid.bidId);
+        bidIds.push(bid.bid_id);
 
         const placement = Object.assign({
-          divName: code,
+          divName: bid.bid_id,
           networkId: networkId,
           siteId: siteId,
           adTypes: bid.adTypes || getSize(sizes),
@@ -191,7 +187,10 @@ ServerBidAdapter = function ServerBidAdapter() {
           data.placements.push(placement);
         }
       }
-      console.log(data);
+
+      if (data.placements.length) {
+        ajax(config.BASE_URI, _responseCallback, JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
+      }
     }
   }
 
@@ -229,8 +228,8 @@ ServerBidAdapter = function ServerBidAdapter() {
   }
 
   function _callBids(config, params) {
-    let doit = isS2S() ? _callBidsS2S : _callBidsStandard;
-    doit(config, params);
+    let callFn = isS2S() ? _callBidsS2S : _callBidsStandard;
+    callFn(config, params);
   }
 
   function _responseCallback(result) {
@@ -239,6 +238,11 @@ ServerBidAdapter = function ServerBidAdapter() {
     let bidObj;
     let bidCode;
     let placementCode;
+    let skipSelectionDecisionsReturnArray = function (decision) {
+      return (decision || []).length ? decision[0] : {};
+    };
+    let identity = function(x) { return x; }
+    let extractionMethod = isS2S() ? skipSelectionDecisionsReturnArray : identity;
 
     try {
       result = JSON.parse(result);
@@ -253,7 +257,7 @@ ServerBidAdapter = function ServerBidAdapter() {
       placementCode = bidObj.placementCode;
 
       if (result) {
-        const decision = result.decisions && result.decisions[bidId];
+        const decision = result.decisions && extractionMethod(result.decisions[bidId]);
         const price = decision && decision.pricing && decision.pricing.clearPrice;
 
         if (decision && price) {
