@@ -7,16 +7,11 @@ import { config } from 'src/config';
 
 const TYPE = S2S.SRC;
 const getConfig = config.getConfig;
-const REQUIRED_S2S_CONFIG_KEYS = ['siteId', 'networkId', 'bidders', 'endpoint'];
+const REQUIRED_S2S_CONFIG_KEYS = ['siteId', 'networkId', 'bidders'];
 
 let _s2sConfig;
-config.setDefaults({
-  's2sConfig': {
-    enabled: false,
-    timeout: 1000,
-    adapter: 'serverbidServer'
-  }
-});
+
+const bidder = 'serverbidServer';
 
 var ServerBidServerAdapter;
 ServerBidServerAdapter = function ServerBidServerAdapter() {
@@ -61,6 +56,8 @@ ServerBidServerAdapter = function ServerBidServerAdapter() {
   sizeMap[43] = '300x600';
 
   function setS2sConfig(options) {
+    if (options.adapter != bidder) return;
+
     let contains = (xs, x) => xs.indexOf(x) > -1;
     let userConfig = Object.keys(options);
 
@@ -103,30 +100,30 @@ ServerBidServerAdapter = function ServerBidServerAdapter() {
   function _callBids(s2sBidRequest, bidRequests, addBidResponse, done, ajax) {
     let bidRequest = s2sBidRequest;
 
-    // one request per ad unit
+    const data = {
+      placements: [],
+      time: Date.now(),
+      user: {},
+      url: utils.getTopWindowUrl(),
+      referrer: document.referrer,
+      enableBotFiltering: true,
+      includePricingData: true,
+      parallel: true
+    };
+    const allBids = [];
+
     for (let i = 0; i < bidRequest.ad_units.length; i++) {
       let adunit = bidRequest.ad_units[i];
       let siteId = _s2sConfig.siteId;
       let networkId = getLocalConfig().networkId;
       let sizes = adunit.sizes;
 
-      const data = {
-        placements: [],
-        time: Date.now(),
-        user: {},
-        url: utils.getTopWindowUrl(),
-        referrer: document.referrer,
-        enableBotFiltering: true,
-        includePricingData: true,
-        parallel: true
-      };
-
-      const bids = adunit.bids || [];
-
+      var bids = adunit.bids || [];
       // one placement for each of the bids
       for (let i = 0; i < bids.length; i++) {
         const bid = bids[i];
         bid.code = adunit.code;
+        allBids.push(bid);
 
         const placement = Object.assign({}, {
           divName: bid.bid_id,
@@ -141,13 +138,13 @@ ServerBidServerAdapter = function ServerBidServerAdapter() {
           data.placements.push(placement);
         }
       }
-      if (data.placements.length) {
-        ajax(BASE_URI, _responseCallback(addBidResponse, bids), JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
-      }
+    }
+    if (data.placements.length) {
+      ajax(BASE_URI, _responseCallback(addBidResponse, allBids, done), JSON.stringify(data), { method: 'POST', withCredentials: true, contentType: 'application/json' });
     }
   }
 
-  function _responseCallback(addBidResponse, bids) {
+  function _responseCallback(addBidResponse, bids, done) {
     return function (resp) {
       let bid;
       let bidId;
@@ -231,6 +228,6 @@ ServerBidServerAdapter.createNew = function() {
   return new ServerBidServerAdapter();
 };
 
-adaptermanager.registerBidAdapter(new ServerBidServerAdapter(), 'serverbidServer');
+adaptermanager.registerBidAdapter(new ServerBidServerAdapter(), bidder);
 
 module.exports = ServerBidServerAdapter;
