@@ -9,6 +9,10 @@ const TYPE = S2S.SRC;
 const getConfig = config.getConfig;
 const REQUIRED_S2S_CONFIG_KEYS = ['siteId', 'networkId', 'bidders'];
 
+const DEFAULT_S2S_TTL = 60;
+const DEFAULT_S2S_CURRENCY = 'USD';
+const DEFAULT_S2S_NETREVENUE = true;
+
 let _s2sConfig;
 
 const bidder = 'serverbidServer';
@@ -184,7 +188,11 @@ ServerBidServerAdapter = function ServerBidServerAdapter() {
               cpm: price,
               width: decision.width,
               height: decision.height,
-              ad: retrieveAd(decision)})
+              ad: retrieveAd(decision)});
+
+            bid.ttl = DEFAULT_S2S_TTL;
+            bid.currency = DEFAULT_S2S_CURRENCY;
+            bid.netRevenue = DEFAULT_S2S_NETREVENUE;
           } else {
             bid = noBid(bidObj);
           }
