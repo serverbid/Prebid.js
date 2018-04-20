@@ -21,6 +21,10 @@ ServerBidAdapter = function ServerBidAdapter() {
     'onefiftytwo': {
       'BASE_URI': 'https://e.serverbid.com/api/v2',
       'SMARTSYNC_BASE_URI': 'https://s.zkcdn.net/ss'
+    },
+    'adsparc': {
+      'BASE_URI': 'https://e.serverbid.com/api/v2',
+      'SMARTSYNC_BASE_URI': 'https://s.zkcdn.net/ss'
     }
   };
 
@@ -202,5 +206,6 @@ ServerBidAdapter.createNew = function() {
 adaptermanager.registerBidAdapter(new ServerBidAdapter(), 'serverbid');
 adaptermanager.aliasBidAdapter('serverbid', 'connectad');
 adaptermanager.aliasBidAdapter('serverbid', 'onefiftytwo');
+adaptermanager.aliasBidAdapter('serverbid', 'adsparc');
 
 module.exports = ServerBidAdapter;
